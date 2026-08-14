@@ -34,7 +34,7 @@ by Apple, so it opens without any Gatekeeper warning.
 
 Or with Homebrew:
 
-    brew install --cask timmccoy/tap/kbd
+    brew install --cask spurious-cox/tap/kbd
 
 ## Accessibility permission
 
