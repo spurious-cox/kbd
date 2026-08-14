@@ -34,7 +34,11 @@ by Apple, so it opens without any Gatekeeper warning.
 
 Or with Homebrew:
 
+    brew trust spurious-cox/tap
     brew install --cask spurious-cox/tap/kbd
+
+Homebrew refuses to load casks from a tap it doesn't know, so the first
+command is required — once per tap, not once per install.
 
 ## Accessibility permission
 
