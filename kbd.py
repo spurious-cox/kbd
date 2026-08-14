@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 KBD - floating numeric keypad for macOS
-Version: 1.4.0
+Version: 1.5.1
 
-A borderless, non-activating floating panel holding a numeric pad
-(1-5 + backspace / 6-0 + . + DISMISS) under a credit bar.  Key presses are
-posted as real keyboard events to the HID event tap, so they land in whatever
-text field currently has keyboard focus -- in any application.
+A borderless, non-activating floating panel holding a numeric pad: two rows
+of digits, a stacked column of space / backspace / return / decimal, and a
+vertical DISMISS, all under a credit bar.  Key presses are posted as real
+keyboard events to the HID event tap, so they land in whatever text field
+currently has keyboard focus -- in any application.
 
 Behaviour:
   * Non-activating panel: clicking a key never steals focus from the text
@@ -32,6 +33,14 @@ its proportions at every size, and one scale factor is also what a future
 iOS port would need.
 
 History:
+  1.5.1  Symbol keys centred on their ink rather than their text box. AppKit
+         centres a title by the line box, which put the low-sitting glyphs
+         (. ⎵ ↵) near the bottom of their keys.
+  1.5.0  Space and return keys added. The right-hand wide keys are replaced
+         by one column of four half-height keys (space, backspace, return,
+         decimal) and a vertical DISMISS spanning both rows, to Tim's
+         mockup: the stacked keys pair up inside each digit row's height,
+         so the two grids stay aligned.
   1.4.0  App icon from Tim's artwork, the same mark centred in the credit
          bar, and an Accessibility permission flow that can ask more than
          once.
@@ -43,10 +52,12 @@ History:
   1.0.0  Initial version: 12 keys, drag anywhere, position remembered.
 """
 
+import math
 import os
 
 import objc
 from Foundation import (
+    NSAffineTransform,
     NSBundle,
     NSObject,
     NSMakePoint,
@@ -67,11 +78,13 @@ from AppKit import (
     NSAttributedString,
     NSBackingStoreBuffered,
     NSBezierPath,
+    NSBitmapImageRep,
     NSButton,
     NSColor,
     NSColorSpace,
     NSCompositingOperationSourceAtop,
     NSCompositingOperationSourceOver,
+    NSDeviceRGBColorSpace,
     NSEvent,
     NSEventModifierFlagOption,
     NSFont,
@@ -80,7 +93,9 @@ from AppKit import (
     NSFontWeightRegular,
     NSFontWeightSemibold,
     NSForegroundColorAttributeName,
+    NSGraphicsContext,
     NSImage,
+    NSImageOnly,
     NSMenu,
     NSMenuItem,
     NSMutableParagraphStyle,
@@ -118,7 +133,7 @@ from ApplicationServices import (
 
 # ---------------------------------------------------------------- constants
 
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.1"
 CREDIT_TEXT = "© 2026 Tim McCoy"
 DEFAULTS_ORIGIN_KEY = "KBDPanelOrigin"
 DEFAULTS_COLOR_KEY = "KBDFieldColor"
@@ -132,24 +147,30 @@ KEYCODES = {
     ".": 47,
 }
 KEYCODE_DELETE = 51
+KEYCODE_SPACE = 49
+KEYCODE_RETURN = 36
 TAG_DISMISS = -1  # sentinel: no keycode can collide with it
 
 # Menu tags: colour presets take their list index, size presets are offset so
 # the two sets can never collide.
 TAG_SIZE_BASE = 100
 
-# Base geometry, in points, at 100%.  Both rows run to the same width: five
-# digit keys then a wide key.  The top row's wide key is backspace; the
-# bottom row's is DISMISS, preceded by the half-width decimal key.
+# Base geometry, in points, at 100%.  Five digit keys wide by two rows, then
+# a column of four half-height keys, then DISMISS standing on end across both
+# rows.  The stacked keys pair up within each digit row's height -- a tight
+# gap inside a pair, the ordinary row gap between pairs -- so the stack reads
+# as two halves of two keys rather than four evenly spaced ones.
 MARGIN = 10.0
 GAP = 8.0
 KEY_W = 56.0
 KEY_H = 46.0
-HALF_KEY_W = KEY_W / 2.0                        # the decimal key: 28
+STACK_W = 56.0
+STACK_GAP = 3.0                                 # inside a pair
+STACK_H = (KEY_H - STACK_GAP) / 2.0             # 21.5
+DISMISS_W = 42.0
+DISMISS_H = KEY_H * 2 + GAP                     # 100
 DIGITS_W = KEY_W * 5 + GAP * 4                  # five digit keys: 312
-DISMISS_W = 132.0
-ROW_W = DIGITS_W + GAP + HALF_KEY_W + GAP + DISMISS_W   # 488
-BACKSPACE_W = ROW_W - DIGITS_W - GAP                    # 168
+ROW_W = DIGITS_W + GAP + STACK_W + GAP + DISMISS_W      # 426
 HEADER_H = 20.0
 HEADER_GAP = 6.0
 PANEL_W = ROW_W + MARGIN * 2                                        # 508
@@ -234,6 +255,84 @@ def load_glyph():
     if path is None:
         return None
     return NSImage.alloc().initWithContentsOfFile_(path)
+
+
+def ink_image(text, font, color):
+    """`text` as an image cropped to the pixels it actually inks.
+
+    A button centres its title on the text line box, which includes the
+    ascender and descender whether or not the glyph uses them: `.`, `⎵` and
+    `↵` all sit at the bottom of that box and so land low on the key.
+    Cropping to the ink and letting the button centre the image instead puts
+    the mark where the eye expects it."""
+    attributes = {
+        NSFontAttributeName: font,
+        NSForegroundColorAttributeName: color,
+    }
+    string = NSAttributedString.alloc().initWithString_attributes_(
+        text, attributes)
+    box = string.size()
+    inset = 4
+    width = int(math.ceil(box.width)) + inset * 2
+    height = int(math.ceil(box.height)) + inset * 2
+
+    rep = NSBitmapImageRep.alloc()
+    rep = rep.initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
+        None, width, height, 8, 4, True, False, NSDeviceRGBColorSpace, 0, 0)
+    context = NSGraphicsContext.graphicsContextWithBitmapImageRep_(rep)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.setCurrentContext_(context)
+    string.drawAtPoint_(NSMakePoint(inset, inset))
+    NSGraphicsContext.restoreGraphicsState()
+
+    # Scan the alpha channel for the ink's bounding box. Rows run top-down
+    # in the bitmap and bottom-up in AppKit, hence the flip below.
+    data = rep.bitmapData()
+    row_bytes = rep.bytesPerRow()
+    min_x, min_y, max_x, max_y = width, height, -1, -1
+    for row in range(height):
+        base = row * row_bytes
+        for column in range(width):
+            if data[base + column * 4 + 3]:
+                min_x = min(min_x, column)
+                max_x = max(max_x, column)
+                min_y = min(min_y, row)
+                max_y = max(max_y, row)
+    if max_x < 0:
+        return None
+
+    image = NSImage.alloc().initWithSize_(
+        NSMakeSize(max_x - min_x + 1, max_y - min_y + 1))
+    image.lockFocus()
+    string.drawAtPoint_(NSMakePoint(
+        inset - min_x, inset - (height - 1 - max_y)))
+    image.unlockFocus()
+    return image
+
+
+def rotated_text_image(text, font, color):
+    """`text` drawn on its side, reading top to bottom.
+
+    AppKit has no vertical button title, so DISMISS is rendered into an image
+    and handed to the button as its picture instead."""
+    attributes = {
+        NSFontAttributeName: font,
+        NSForegroundColorAttributeName: color,
+    }
+    string = NSAttributedString.alloc().initWithString_attributes_(
+        text, attributes)
+    size = string.size()
+    image = NSImage.alloc().initWithSize_(NSMakeSize(size.height, size.width))
+    image.lockFocus()
+    transform = NSAffineTransform.transform()
+    # Composed as translate(rotate(p)): a point is turned a quarter turn
+    # clockwise, then pushed back up into the image.
+    transform.translateXBy_yBy_(0.0, size.width)
+    transform.rotateByDegrees_(-90.0)
+    transform.concat()
+    string.drawAtPoint_(NSMakePoint(0.0, 0.0))
+    image.unlockFocus()
+    return image
 
 
 def tinted_glyph(glyph, color, height):
@@ -440,6 +539,8 @@ class KeyButton(NSButton):
         self.baseFontSize = 24.0
         self.fontWeight = NSFontWeightMedium
         self.titleText = ""
+        self.vertical = False       # DISMISS reads top to bottom
+        self.centerInk = False      # centre the glyph, not its text box
         self.setBordered_(False)
         self.setWantsLayer_(True)
         layer = self.layer()
@@ -750,22 +851,32 @@ class KeypadController(NSObject):
         self.addKeys_toView_atY_(["1", "2", "3", "4", "5"], field, top_y)
         self.addKeys_toView_atY_(["6", "7", "8", "9", "0"], field, bottom_y)
 
-        # Right of the digits: backspace fills the top row, while the bottom
-        # row is the half-width decimal key followed by DISMISS, both rows
-        # finishing flush at ROW_W.
-        wide_x = MARGIN + DIGITS_W + GAP
-        dismiss_x = MARGIN + ROW_W - DISMISS_W
-        for title, rect, size, weight, tag in (
-            (u"⌫", NSMakeRect(wide_x, top_y, BACKSPACE_W, KEY_H),
-             22.0, NSFontWeightMedium, KEYCODE_DELETE),
-            (".", NSMakeRect(wide_x, bottom_y, HALF_KEY_W, KEY_H),
-             24.0, NSFontWeightMedium, KEYCODES["."]),
+        # The stacked column, top to bottom: space and backspace share the
+        # top row's height, return and decimal share the bottom row's.
+        stack_x = MARGIN + DIGITS_W + GAP
+        upper = STACK_H + STACK_GAP
+        for title, y, tag in (
+            (u"⎵", top_y + upper, KEYCODE_SPACE),
+            (u"⌫", top_y, KEYCODE_DELETE),
+            (u"↵", bottom_y + upper, KEYCODE_RETURN),
+            (".", bottom_y, KEYCODES["."]),
         ):
-            field.addSubview_(self.makeKey_frame_size_weight_tag_action_(
-                title, rect, size, weight, tag, "keyTapped:"))
-        field.addSubview_(self.makeKey_frame_size_weight_tag_action_(
-            "DISMISS", NSMakeRect(dismiss_x, bottom_y, DISMISS_W, KEY_H),
-            15.0, NSFontWeightSemibold, TAG_DISMISS, "dismiss:"))
+            key = self.makeKey_frame_size_weight_tag_action_(
+                title, NSMakeRect(stack_x, y, STACK_W, STACK_H),
+                15.0, NSFontWeightMedium, tag, "keyTapped:")
+            key.centerInk = True
+            self.styleKey_(key)
+            field.addSubview_(key)
+
+        # DISMISS stands on end beside them, spanning both rows.
+        dismiss = self.makeKey_frame_size_weight_tag_action_(
+            "DISMISS",
+            NSMakeRect(MARGIN + ROW_W - DISMISS_W, bottom_y,
+                       DISMISS_W, DISMISS_H),
+            13.0, NSFontWeightSemibold, TAG_DISMISS, "dismiss:")
+        dismiss.vertical = True
+        self.styleKey_(dismiss)
+        field.addSubview_(dismiss)
 
         for subview in field.subviews():
             subview.setMenu_(menu)  # right-click works over the keys too
@@ -804,10 +915,19 @@ class KeypadController(NSObject):
 
     def styleKey_(self, button):
         """(Re)apply the key's title at the current scale."""
-        paragraph = NSMutableParagraphStyle.alloc().init()
-        paragraph.setAlignment_(NSTextAlignmentCenter)
         font = NSFont.systemFontOfSize_weight_(
             button.baseFontSize * self.scale, button.fontWeight)
+        if button.vertical or button.centerInk:
+            image = (rotated_text_image(button.titleText, font, KEY_TEXT)
+                     if button.vertical
+                     else ink_image(button.titleText, font, KEY_TEXT))
+            if image is not None:
+                button.setImage_(image)
+                button.setImagePosition_(NSImageOnly)
+                return
+
+        paragraph = NSMutableParagraphStyle.alloc().init()
+        paragraph.setAlignment_(NSTextAlignmentCenter)
         attributes = {
             NSFontAttributeName: font,
             NSForegroundColorAttributeName: KEY_TEXT,

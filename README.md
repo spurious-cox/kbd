@@ -16,6 +16,9 @@ pasting or scripting.
   does not make it the active app and does not move the cursor out of the
   field you're filling in. Your selection and insertion point stay exactly
   where they were.
+- **Digits and the keys that go with them.** 0–9 plus decimal point, space,
+  return and backspace — enough to fill in a field and commit it without
+  reaching for the keyboard.
 - **Goes where you want it.** Drag from anywhere on the coloured field — the
   whole background is the handle. It floats above your windows, on every
   Space, including full-screen apps.

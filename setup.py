@@ -1,4 +1,4 @@
-"""py2app build for KBD.app — v1.4.0
+"""py2app build for KBD.app — v1.5.1
 
     ./venv/bin/python make_icon.py      (icon/ must be built first)
     ./venv/bin/python setup.py py2app
@@ -23,8 +23,8 @@ OPTIONS = {
         "CFBundleName": "KBD",
         "CFBundleDisplayName": "KBD",
         "CFBundleIdentifier": "com.timmccoy.kbd",
-        "CFBundleShortVersionString": "1.4.0",
-        "CFBundleVersion": "1.4.0",
+        "CFBundleShortVersionString": "1.5.1",
+        "CFBundleVersion": "1.5.1",
         "LSMinimumSystemVersion": "13.0",
         "NSHighResolutionCapable": True,
         # Accessory app: no Dock icon, no menu bar, never activates.

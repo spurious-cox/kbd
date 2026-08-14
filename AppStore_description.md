@@ -54,7 +54,7 @@ it.
 - Types into the focused text field in any application
 - Never steals focus — your cursor and selection stay put
 - Sends real keyboard events; no per-app setup or compatibility list
-- Digits, decimal point and backspace
+- Digits 0–9, decimal point, space, return and backspace
 - Drag from anywhere on the pad to reposition
 - Floats above all windows, on every Space and over full-screen apps
 - Resizable from 60% to 300%, scaling as a single unit
