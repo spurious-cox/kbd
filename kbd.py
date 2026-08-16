@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 KBD - floating numeric keypad for macOS
-Version: 1.5.1
+Version: 1.5.2
 
 A borderless, non-activating floating panel holding a numeric pad: two rows
 of digits, a stacked column of space / backspace / return / decimal, and a
@@ -33,6 +33,9 @@ its proportions at every size, and one scale factor is also what a future
 iOS port would need.
 
 History:
+  1.5.2  "Green" preset changed to DupScore's own icon green, RGB(21,101,64)
+         / #156540, matching the iOS KBD so a colour name means the same
+         thing on both platforms.
   1.5.1  Symbol keys centred on their ink rather than their text box. AppKit
          centres a title by the line box, which put the low-sitting glyphs
          (. ⎵ ↵) near the bottom of their keys.
@@ -133,7 +136,7 @@ from ApplicationServices import (
 
 # ---------------------------------------------------------------- constants
 
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.5.2"
 CREDIT_TEXT = "© 2026 Tim McCoy"
 DEFAULTS_ORIGIN_KEY = "KBDPanelOrigin"
 DEFAULTS_COLOR_KEY = "KBDFieldColor"
@@ -205,7 +208,9 @@ FIELD_PRESETS = [
     ("Blue", DEFAULT_FIELD_COLOR),
     ("Indigo", (0.35, 0.34, 0.84)),
     ("Teal", (0.11, 0.60, 0.62)),
-    ("Green", (0.20, 0.64, 0.35)),
+    # DupScore green, sampled from that app's icon: RGB(21,101,64) / #156540.
+    # Matched to the iOS KBD's preset so "Green" means one colour on both.
+    ("Green", (0.082, 0.396, 0.251)),
     ("Orange", (0.95, 0.55, 0.15)),
     ("Red", (0.83, 0.26, 0.26)),
     ("Graphite", (0.38, 0.39, 0.42)),
