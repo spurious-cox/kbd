@@ -1,4 +1,4 @@
-"""py2app build for KBD.app — v1.5.1
+"""py2app build for KBD.app
 
     ./venv/bin/python make_icon.py      (icon/ must be built first)
     ./venv/bin/python setup.py py2app
@@ -11,10 +11,32 @@ KBD_glyph.png ships in Resources because the app draws the same mark as its
 icon in its own credit bar, recolouring it to suit the field colour.
 """
 
+import re
+from pathlib import Path
+
 from setuptools import setup
 
 APP = ["kbd.py"]
 DATA_FILES = [("", ["icon/KBD_glyph.png"])]
+
+
+def app_version():
+    """The single source of truth: APP_VERSION in kbd.py.
+
+    These were separate numbers until 1.5.2, and they drifted the first time
+    it mattered — kbd.py said 1.5.2 and drew "KBD 1.5.2" in its own credit
+    bar while the bundle it shipped in still declared 1.5.1. Reading it from
+    the source means the two cannot disagree again. Bump APP_VERSION in
+    kbd.py and nowhere else.
+    """
+    source = Path(__file__).with_name("kbd.py").read_text()
+    match = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', source, re.MULTILINE)
+    if not match:
+        raise SystemExit("setup.py: APP_VERSION not found in kbd.py")
+    return match.group(1)
+
+
+VERSION = app_version()
 
 OPTIONS = {
     "argv_emulation": False,
@@ -23,8 +45,8 @@ OPTIONS = {
         "CFBundleName": "KBD",
         "CFBundleDisplayName": "KBD",
         "CFBundleIdentifier": "com.timmccoy.kbd",
-        "CFBundleShortVersionString": "1.5.1",
-        "CFBundleVersion": "1.5.1",
+        "CFBundleShortVersionString": VERSION,
+        "CFBundleVersion": VERSION,
         "LSMinimumSystemVersion": "13.0",
         "NSHighResolutionCapable": True,
         # Accessory app: no Dock icon, no menu bar, never activates.
