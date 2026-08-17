@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 KBD - floating numeric keypad for macOS
-Version: 1.5.2
+Version: 1.6.0
 
 A borderless, non-activating floating panel holding a numeric pad: two rows
-of digits, a stacked column of space / backspace / return / decimal, and a
-vertical DISMISS, all under a credit bar.  Key presses are posted as real
+of digits, a stacked column of space / backspace / tab / return / decimal,
+and a vertical DISMISS, all under a credit bar.  Key presses are posted as real
 keyboard events to the HID event tap, so they land in whatever text field
 currently has keyboard focus -- in any application.
 
@@ -33,6 +33,14 @@ its proportions at every size, and one scale factor is also what a future
 iOS port would need.
 
 History:
+  1.6.0  Tab key added, to Tim's design.  The stacked column now holds five
+         keys butted together with no gap -- the key radius and border alone
+         divide them -- and narrowed to DISMISS_W so the two vertical strips
+         match.  TAB takes the centre slot, the other four keeping their
+         order around it.  Panel is 432x146, 14pt narrower than 1.5.x.
+         Mac only: an iOS keyboard extension cannot move focus between
+         fields (UITextDocumentProxy has no API for it), which is why tab
+         was removed from the iOS build at its own 1.5.0.
   1.5.2  "Green" preset changed to DupScore's own icon green, RGB(21,101,64)
          / #156540, matching the iOS KBD so a colour name means the same
          thing on both platforms.
@@ -136,7 +144,7 @@ from ApplicationServices import (
 
 # ---------------------------------------------------------------- constants
 
-APP_VERSION = "1.5.2"
+APP_VERSION = "1.6.0"
 CREDIT_TEXT = "© 2026 Tim McCoy"
 DEFAULTS_ORIGIN_KEY = "KBDPanelOrigin"
 DEFAULTS_COLOR_KEY = "KBDFieldColor"
@@ -152,6 +160,7 @@ KEYCODES = {
 KEYCODE_DELETE = 51
 KEYCODE_SPACE = 49
 KEYCODE_RETURN = 36
+KEYCODE_TAB = 48
 TAG_DISMISS = -1  # sentinel: no keycode can collide with it
 
 # Menu tags: colour presets take their list index, size presets are offset so
@@ -159,21 +168,23 @@ TAG_DISMISS = -1  # sentinel: no keycode can collide with it
 TAG_SIZE_BASE = 100
 
 # Base geometry, in points, at 100%.  Five digit keys wide by two rows, then
-# a column of four half-height keys, then DISMISS standing on end across both
-# rows.  The stacked keys pair up within each digit row's height -- a tight
-# gap inside a pair, the ordinary row gap between pairs -- so the stack reads
-# as two halves of two keys rather than four evenly spaced ones.
+# a column of FIVE keys, then DISMISS standing on end across both rows.  The
+# stacked keys butt together with no gap, so the column reads as one ruled
+# strip and the key radius and border alone divide it; that recovers the 14pt
+# the old pair gaps spent and buys a fifth slot (TAB) at dead centre.  The
+# column is DISMISS_W wide so the two vertical strips match.
 MARGIN = 10.0
 GAP = 8.0
 KEY_W = 56.0
 KEY_H = 46.0
-STACK_W = 56.0
-STACK_GAP = 3.0                                 # inside a pair
-STACK_H = (KEY_H - STACK_GAP) / 2.0             # 21.5
 DISMISS_W = 42.0
 DISMISS_H = KEY_H * 2 + GAP                     # 100
+STACK_COUNT = 5
+STACK_W = DISMISS_W                             # matches the DISMISS strip
+STACK_GAP = 0.0                                 # keys butt together
+STACK_H = DISMISS_H / STACK_COUNT               # 20
 DIGITS_W = KEY_W * 5 + GAP * 4                  # five digit keys: 312
-ROW_W = DIGITS_W + GAP + STACK_W + GAP + DISMISS_W      # 426
+ROW_W = DIGITS_W + GAP + STACK_W + GAP + DISMISS_W      # 412
 HEADER_H = 20.0
 HEADER_GAP = 6.0
 PANEL_W = ROW_W + MARGIN * 2                                        # 508
@@ -856,16 +867,18 @@ class KeypadController(NSObject):
         self.addKeys_toView_atY_(["1", "2", "3", "4", "5"], field, top_y)
         self.addKeys_toView_atY_(["6", "7", "8", "9", "0"], field, bottom_y)
 
-        # The stacked column, top to bottom: space and backspace share the
-        # top row's height, return and decimal share the bottom row's.
+        # The stacked column, evenly divided across both rows' height and
+        # listed bottom to top, so TAB lands in the middle slot with the
+        # original four keeping their order around it.
         stack_x = MARGIN + DIGITS_W + GAP
-        upper = STACK_H + STACK_GAP
-        for title, y, tag in (
-            (u"⎵", top_y + upper, KEYCODE_SPACE),
-            (u"⌫", top_y, KEYCODE_DELETE),
-            (u"↵", bottom_y + upper, KEYCODE_RETURN),
-            (".", bottom_y, KEYCODES["."]),
-        ):
+        for index, (title, tag) in enumerate((
+            (".", KEYCODES["."]),
+            (u"↵", KEYCODE_RETURN),
+            (u"⇥", KEYCODE_TAB),
+            (u"⌫", KEYCODE_DELETE),
+            (u"⎵", KEYCODE_SPACE),
+        )):
+            y = bottom_y + STACK_H * index
             key = self.makeKey_frame_size_weight_tag_action_(
                 title, NSMakeRect(stack_x, y, STACK_W, STACK_H),
                 15.0, NSFontWeightMedium, tag, "keyTapped:")
