@@ -5,10 +5,9 @@ already working in — in any application.
 
 ![KBD](icon/KBD_1024.png)
 
-Spreadsheets, scoring software, web forms, databases, your own tools: if it
-accepts typing, it accepts KBD. There is nothing to configure per app and no
-compatibility list, because the keys send genuine keyboard events rather than
-pasting or scripting.
+Spreadsheets, scoring software, web forms, databases: if it accepts typing,
+it accepts KBD. The keys send genuine keyboard events rather than pasting or
+scripting, so there is nothing to configure per app.
 
 ## What it does
 
@@ -51,15 +50,12 @@ straight to the right settings pane:
 
 **System Settings → Privacy & Security → Accessibility** — switch on KBD.
 
-The keys start working as soon as you do; the keypad notices on its own and
-there's no need to restart it. While the permission is missing, the credit bar
-says `KBD — needs Accessibility` rather than failing silently, and
-`Accessibility Permission…` on the right-click menu reopens that pane any
-time.
+The keys start working as soon as you do — no restart needed. Until then the
+credit bar says `KBD — needs Accessibility`, and `Accessibility Permission…`
+on the right-click menu reopens that pane.
 
-This permission is what makes KBD work at all, and it's also why the app
-cannot be distributed through the Mac App Store: store apps must be sandboxed,
-and the sandbox exists precisely to prevent one app from typing into another.
+The same permission is why KBD cannot go on the Mac App Store: store apps must
+be sandboxed, and the sandbox exists to stop one app typing into another.
 
 ## Building from source
 
@@ -71,9 +67,9 @@ Requires macOS 13 or later and Python 3 with a virtual environment:
     ./venv/bin/python make_icon.py
     ./build.sh --install
 
-`build.sh` signs every Mach-O in the bundle under the hardened runtime, which
-`codesign --deep` does not do for a py2app bundle. `release.sh` notarizes the
-app and the DMG and staples both; it expects a `notarytool` keychain profile.
+`build.sh` signs every Mach-O in the bundle under the hardened runtime.
+`release.sh` notarizes the app and the DMG and staples both, using a
+`notarytool` keychain profile.
 
 To preview a layout change without launching anything:
 
